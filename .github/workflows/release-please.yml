@@ -1,0 +1,68 @@
+name: 🎯 release-please (reusable)
+
+# Reusable version-bump + changelog + GitHub-release workflow.
+# Driven by Conventional Commits via googleapis/release-please-action.
+# On each push to the default branch it opens/updates a "release PR" that
+# bumps the version file(s) and rewrites CHANGELOG.md. Merging that PR tags
+# vX.Y.Z and creates the GitHub Release. Callers chain publish.yml off the
+# `release_created` output (same run, so no PAT is needed to trigger it).
+#
+#   jobs:
+#     release:
+#       uses: bamr87/.github/.github/workflows/release-please.yml@main
+#       permissions: { contents: write, pull-requests: write }
+
+on:
+  workflow_call:
+    inputs:
+      config-file:
+        type: string
+        default: release-please-config.json
+      manifest-file:
+        type: string
+        default: .release-please-manifest.json
+      target-branch:
+        type: string
+        default: main
+    secrets:
+      RELEASE_PLEASE_TOKEN:
+        description: >
+          Optional PAT so the release PR's commits trigger CI (commits made with
+          the default GITHUB_TOKEN do not trigger other workflows). Falls back to
+          GITHUB_TOKEN when unset.
+        required: false
+    outputs:
+      releases_created:
+        description: "true if any release was created on this run"
+        value: ${{ jobs.release-please.outputs.releases_created }}
+      release_created:
+        description: "true if the root component was released"
+        value: ${{ jobs.release-please.outputs.release_created }}
+      tag_name:
+        description: "the created tag (e.g. v1.2.3)"
+        value: ${{ jobs.release-please.outputs.tag_name }}
+      version:
+        description: "the released version (e.g. 1.2.3)"
+        value: ${{ jobs.release-please.outputs.version }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.rp.outputs.releases_created }}
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}
+          target-branch: ${{ inputs.target-branch }}

@@ -1,0 +1,7 @@
+{
+  "name": "bamr87 · CI gate",
+  "description": "Reusable merge-to-main quality gate: detects the stack and runs tests, lint, build, docs, Conventional-Commit lint, and CodeQL.",
+  "iconName": "octicon check-circle",
+  "categories": ["Continuous integration"],
+  "filePatterns": ["package.json$", ".*\\.gemspec$", "pyproject\\.toml$", "_config\\.yml$"]
+}

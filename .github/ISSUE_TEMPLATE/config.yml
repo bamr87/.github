@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🛰️ bamr87 dash
+    url: https://bamr87.github.io/bamr87/
+    about: Portfolio, monitoring board, and project command center.
+  - name: 📦 Release methodology
+    url: https://github.com/bamr87/.github#readme
+    about: How releases, versioning, and CI work across these repos.

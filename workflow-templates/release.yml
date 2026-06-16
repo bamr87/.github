@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    branches: [$default-branch]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: bamr87/.github/.github/workflows/release-please.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+    secrets: inherit
+
+  publish:
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
+    uses: bamr87/.github/.github/workflows/publish.yml@main
+    with:
+      tag: ${{ needs.release.outputs.tag_name }}
+      version: ${{ needs.release.outputs.version }}
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    secrets: inherit

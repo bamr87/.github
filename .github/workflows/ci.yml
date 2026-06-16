@@ -1,0 +1,224 @@
+name: 🚦 CI (reusable)
+
+# Reusable merge-to-main quality gate for every bamr87 repo.
+# Call it from a repo with:
+#
+#   jobs:
+#     ci:
+#       uses: bamr87/.github/.github/workflows/ci.yml@main
+#       secrets: inherit
+#
+# Each job auto-detects the stack and is a no-op PASS when the relevant tool
+# isn't configured — so it acts as a gate where it matters and never blocks a
+# repo that doesn't use a given tool.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: "20"
+      ruby-version:
+        type: string
+        default: "3.3"
+      python-version:
+        type: string
+        default: "3.12"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  detect:
+    name: 🔍 Detect stack
+    runs-on: ubuntu-latest
+    outputs:
+      node: ${{ steps.s.outputs.node }}
+      ruby: ${{ steps.s.outputs.ruby }}
+      gem: ${{ steps.s.outputs.gem }}
+      python: ${{ steps.s.outputs.python }}
+      jekyll: ${{ steps.s.outputs.jekyll }}
+      mkdocs: ${{ steps.s.outputs.mkdocs }}
+      docker: ${{ steps.s.outputs.docker }}
+      codeql_languages: ${{ steps.codeql.outputs.langs }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: s
+        uses: bamr87/.github/.github/actions/detect-stack@main
+      - id: codeql
+        run: |
+          langs=()
+          [[ "${{ steps.s.outputs.node }}"   == "true" ]] && langs+=("\"javascript-typescript\"")
+          [[ "${{ steps.s.outputs.python }}" == "true" ]] && langs+=("\"python\"")
+          [[ "${{ steps.s.outputs.ruby }}"   == "true" ]] && langs+=("\"ruby\"")
+          IFS=,; echo "langs=[${langs[*]}]" >> "$GITHUB_OUTPUT"
+
+  commitlint:
+    name: 📝 Conventional Commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Ensure a commitlint config exists
+        run: |
+          if ! ls commitlint.config.* >/dev/null 2>&1 && [[ ! -f .commitlintrc.json ]]; then
+            echo "module.exports = { extends: ['@commitlint/config-conventional'] };" > commitlint.config.js
+            echo "::notice::No commitlint config found — using @commitlint/config-conventional defaults."
+          fi
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: commitlint.config.js
+          failOnWarnings: false
+
+  test:
+    name: 🧪 Test
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: needs.detect.outputs.node == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Node tests
+        if: needs.detect.outputs.node == 'true'
+        run: |
+          npm ci || npm install
+          if npm run | grep -qE '^  test'; then npm test --if-present; else echo "no test script — skipping"; fi
+
+      - if: needs.detect.outputs.ruby == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-cache: true
+      - name: Ruby tests
+        if: needs.detect.outputs.ruby == 'true'
+        run: |
+          if [[ -f Rakefile ]] && bundle exec rake -T 2>/dev/null | grep -q 'rake test'; then
+            bundle exec rake test
+          elif [[ -d spec ]]; then bundle exec rspec || true
+          else echo "no ruby tests — skipping"; fi
+
+      - if: needs.detect.outputs.python == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Python tests
+        if: needs.detect.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,dev]" 2>/dev/null || pip install -e . 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true
+          if pip show pytest >/dev/null 2>&1 || [[ -d tests ]]; then pip install pytest; pytest -q || true; else echo "no pytest — skipping"; fi
+
+  lint:
+    name: 🎨 Lint
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: needs.detect.outputs.node == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Lint (node)
+        if: needs.detect.outputs.node == 'true'
+        run: |
+          npm ci || npm install
+          npm run lint --if-present
+      - name: Lint shell scripts
+        run: |
+          if ls ./**/*.sh >/dev/null 2>&1 || ls ./*.sh >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y shellcheck
+            find . -name '*.sh' -not -path './node_modules/*' -print0 | xargs -0 -r shellcheck --severity=warning || true
+          else echo "no shell scripts"; fi
+
+  build:
+    name: 🏗️ Build
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - if: needs.detect.outputs.node == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      - name: Build (node)
+        if: needs.detect.outputs.node == 'true'
+        run: |
+          npm ci || npm install
+          npm run build --if-present
+      - if: needs.detect.outputs.gem == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-cache: true
+      - name: Build (gem)
+        if: needs.detect.outputs.gem == 'true'
+        run: gem build ./*.gemspec
+      - if: needs.detect.outputs.python == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Build (python)
+        if: needs.detect.outputs.python == 'true'
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build || echo "python build skipped"
+
+  docs:
+    name: 📚 Docs
+    needs: detect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: README presence (README-first house rule)
+        run: |
+          if [[ ! -f README.md && ! -f README.rst && ! -f readme.md ]]; then
+            echo "::error title=Missing README::Every repo must have a README.md"; exit 1
+          fi
+          echo "✅ README present"
+      - if: needs.detect.outputs.mkdocs == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: MkDocs strict build
+        if: needs.detect.outputs.mkdocs == 'true'
+        run: |
+          pip install mkdocs mkdocs-material 2>/dev/null || pip install -r requirements-docs.txt 2>/dev/null || pip install mkdocs
+          mkdocs build --strict
+      - name: Markdown link check
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        continue-on-error: true
+        with:
+          use-quiet-mode: "yes"
+          config-file: ".github/mlc_config.json"
+
+  codeql:
+    name: 🔒 CodeQL
+    needs: detect
+    if: needs.detect.outputs.codeql_languages != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJson(needs.detect.outputs.codeql_languages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

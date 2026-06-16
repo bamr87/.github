@@ -1,0 +1,7 @@
+{
+  "name": "bamr87 · Release (release-please)",
+  "description": "Conventional-Commit driven version bump + CHANGELOG + GitHub Release, then publish to RubyGems / npm / PyPI / GHCR.",
+  "iconName": "octicon rocket",
+  "categories": ["Deployment"],
+  "filePatterns": ["release-please-config\\.json$"]
+}

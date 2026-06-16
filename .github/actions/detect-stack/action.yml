@@ -1,0 +1,70 @@
+name: Detect Stack
+description: >
+  Inspect the checked-out repository and emit booleans describing its
+  ecosystem (node, ruby, python, jekyll, docker, mkdocs) plus the package
+  registry it most likely publishes to. Used by the reusable ci.yml and
+  publish.yml so a single pipeline adapts to any repo in the fleet.
+
+outputs:
+  node:
+    description: "true if a package.json is present"
+    value: ${{ steps.detect.outputs.node }}
+  ruby:
+    description: "true if a *.gemspec or Gemfile is present"
+    value: ${{ steps.detect.outputs.ruby }}
+  gem:
+    description: "true if a *.gemspec is present (publishable gem)"
+    value: ${{ steps.detect.outputs.gem }}
+  python:
+    description: "true if pyproject.toml or setup.py is present"
+    value: ${{ steps.detect.outputs.python }}
+  jekyll:
+    description: "true if a _config.yml is present"
+    value: ${{ steps.detect.outputs.jekyll }}
+  mkdocs:
+    description: "true if mkdocs.yml is present"
+    value: ${{ steps.detect.outputs.mkdocs }}
+  docker:
+    description: "true if a Dockerfile is present"
+    value: ${{ steps.detect.outputs.docker }}
+  registry:
+    description: "primary publish registry: rubygems | npm | pypi | ghcr | none"
+    value: ${{ steps.detect.outputs.registry }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect ecosystem
+      id: detect
+      shell: bash
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+
+        node=false; ruby=false; gem=false; python=false
+        jekyll=false; mkdocs=false; docker=false
+
+        [[ -f package.json ]] && node=true
+        gemspecs=(*.gemspec)
+        [[ ${#gemspecs[@]} -gt 0 ]] && { ruby=true; gem=true; }
+        [[ -f Gemfile ]] && ruby=true
+        { [[ -f pyproject.toml ]] || [[ -f setup.py ]]; } && python=true
+        [[ -f _config.yml ]] && jekyll=true
+        [[ -f mkdocs.yml ]] && mkdocs=true
+        [[ -f Dockerfile ]] && docker=true
+
+        # Primary publish registry (most specific wins).
+        registry=none
+        if   [[ $gem    == true ]]; then registry=rubygems
+        elif [[ $node   == true ]] && grep -q '"name"' package.json 2>/dev/null && ! grep -q '"private": *true' package.json 2>/dev/null; then registry=npm
+        elif [[ $python == true ]]; then registry=pypi
+        elif [[ $docker == true ]]; then registry=ghcr
+        fi
+
+        {
+          echo "node=$node"; echo "ruby=$ruby"; echo "gem=$gem"
+          echo "python=$python"; echo "jekyll=$jekyll"; echo "mkdocs=$mkdocs"
+          echo "docker=$docker"; echo "registry=$registry"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "::notice title=Stack detected::node=$node ruby=$ruby python=$python jekyll=$jekyll docker=$docker → registry=$registry"
