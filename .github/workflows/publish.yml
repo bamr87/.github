@@ -68,7 +68,20 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
-          bundler-cache: true
+          # Intentionally NOT bundler-cache:true — that runs a *frozen* bundle
+          # install, which fails at release time whenever a gemspec/path-gem
+          # version bump hasn't been re-locked ("the gemspecs for path gems
+          # changed, but the lockfile can't be updated because frozen mode is
+          # set"). release-please bumps version.rb but not Gemfile.lock, so the
+          # lock is stale by definition on the release commit. gem build needs
+          # no bundle; the non-frozen install below just keeps deps available.
+          bundler-cache: false
+      - name: Install deps (non-frozen — tolerate release-time version bump)
+        run: |
+          if [[ -f Gemfile ]]; then
+            bundle config set --local frozen false
+            bundle install --jobs 4
+          fi
       - name: Guard credential
         run: |
           if [[ -z "${{ secrets.RUBYGEMS_API_KEY }}" ]]; then

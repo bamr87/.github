@@ -44,6 +44,12 @@ on:
       version:
         description: "the released version (e.g. 1.2.3)"
         value: ${{ jobs.release-please.outputs.version }}
+      prs_created:
+        description: "true if a release PR was opened/updated on this run"
+        value: ${{ jobs.release-please.outputs.prs_created }}
+      pr:
+        description: "JSON of the open release PR (headBranchName, number, ...)"
+        value: ${{ jobs.release-please.outputs.pr }}
 
 permissions:
   contents: write
@@ -58,6 +64,8 @@ jobs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
       version: ${{ steps.rp.outputs.version }}
+      prs_created: ${{ steps.rp.outputs.prs_created }}
+      pr: ${{ steps.rp.outputs.pr }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v4
@@ -66,3 +74,49 @@ jobs:
           config-file: ${{ inputs.config-file }}
           manifest-file: ${{ inputs.manifest-file }}
           target-branch: ${{ inputs.target-branch }}
+
+  # When release-please opens/updates a release PR, the version bump it makes to
+  # the version file is NOT reflected in lockfiles (Gemfile.lock pins the gemspec
+  # path-gem version; package-lock.json carries the project version). Left stale,
+  # this breaks frozen installs (`bundle install --deployment`, `npm ci`) on the
+  # merge commit — including the publish pipeline. Re-lock them on the PR branch
+  # in this same run so the merge lands a self-consistent main.
+  relock:
+    name: 🔁 Sync release-PR lockfiles
+    needs: release-please
+    if: needs.release-please.outputs.prs_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+      - name: Re-lock Gemfile.lock
+        if: hashFiles('Gemfile') != ''
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+      - if: hashFiles('Gemfile') != ''
+        run: |
+          bundle config set --local frozen false
+          bundle lock   # re-resolves conservatively: only the path-gem version line moves
+
+      - name: Sync package-lock.json version
+        if: hashFiles('package-lock.json') != ''
+        run: |
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json"));const l=JSON.parse(fs.readFileSync("package-lock.json"));l.version=p.version;if(l.packages&&l.packages[""])l.packages[""].version=p.version;fs.writeFileSync("package-lock.json",JSON.stringify(l,null,2)+"\n")'
+
+      - name: Commit & push if changed
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: sync lockfiles to released version"
+            git push
+          else
+            echo "Lockfiles already in sync."
+          fi
