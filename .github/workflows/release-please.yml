@@ -29,7 +29,17 @@ on:
         description: >
           Optional PAT so the release PR's commits trigger CI (commits made with
           the default GITHUB_TOKEN do not trigger other workflows). Falls back to
-          GITHUB_TOKEN when unset.
+          GITHUB_TOKEN when unset. Prefer the GitHub App secrets below (no expiry).
+        required: false
+      RELEASE_PLEASE_APP_ID:
+        description: >
+          Optional GitHub App ID. When set (with RELEASE_PLEASE_APP_PRIVATE_KEY),
+          an installation token is minted per job and used INSTEAD of
+          RELEASE_PLEASE_TOKEN — so the release PR and its lockfile-relock commit
+          trigger CI without a personal PAT (no rotation toil). Preferred path.
+        required: false
+      RELEASE_PLEASE_APP_PRIVATE_KEY:
+        description: "PEM private key for the RELEASE_PLEASE_APP_ID GitHub App."
         required: false
     outputs:
       releases_created:
@@ -59,6 +69,9 @@ jobs:
   release-please:
     name: release-please
     runs-on: ubuntu-latest
+    # Exposed to step-level `if` (the secrets context is not available there).
+    env:
+      RP_APP_ID: ${{ secrets.RELEASE_PLEASE_APP_ID }}
     outputs:
       releases_created: ${{ steps.rp.outputs.releases_created }}
       release_created: ${{ steps.rp.outputs.release_created }}
@@ -67,10 +80,19 @@ jobs:
       prs_created: ${{ steps.rp.outputs.prs_created }}
       pr: ${{ steps.rp.outputs.pr }}
     steps:
+      - name: Mint GitHub App token
+        id: app-token
+        if: env.RP_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
       - id: rp
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          # App token (preferred) → PAT → GITHUB_TOKEN. Only the first two make
+          # the release PR + relock commit trigger CI (GITHUB_TOKEN does not).
+          token: ${{ steps.app-token.outputs.token || secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: ${{ inputs.config-file }}
           manifest-file: ${{ inputs.manifest-file }}
           target-branch: ${{ inputs.target-branch }}
@@ -88,11 +110,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RP_APP_ID: ${{ secrets.RELEASE_PLEASE_APP_ID }}
     steps:
+      - name: Mint GitHub App token
+        id: app-token
+        if: env.RP_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
       - uses: actions/checkout@v4
         with:
+          # Push uses the checkout token: App token (preferred) re-triggers CI on
+          # the release PR so the version↔lock guard runs on the final HEAD.
           ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ steps.app-token.outputs.token || secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
       - name: Re-lock Gemfile.lock
         if: hashFiles('Gemfile') != ''
