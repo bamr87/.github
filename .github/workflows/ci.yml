@@ -12,21 +12,35 @@ name: 🚦 CI (reusable)
 # isn't configured — so it acts as a gate where it matters and never blocks a
 # repo that doesn't use a given tool.
 
+# TOOLCHAIN VERSIONS
+# ------------------
+# Resolution order per language: an explicit caller input, else the CALLING
+# repo's `vars.*` variable, else the built-in default. The middle rung lets the
+# dash bump a version across the whole fleet from one file — `_data/fleet.yml`
+# in bamr87/bamr87, projected onto every repo by `dash config sync` — instead of
+# editing ~40 workflows. Inputs default to "" on purpose: a non-empty default
+# would always win and mask the variable.
+
 on:
   workflow_call:
     inputs:
       node-version:
         type: string
-        default: "20"
+        default: ""
       ruby-version:
         type: string
-        default: "3.3"
+        default: ""
       python-version:
         type: string
-        default: "3.12"
+        default: ""
 
 permissions:
   contents: read
+
+env:
+  NODE_V: ${{ inputs.node-version || vars.NODE_VERSION || '20' }}
+  RUBY_V: ${{ inputs.ruby-version || vars.RUBY_VERSION || '3.3' }}
+  PYTHON_V: ${{ inputs.python-version || vars.PYTHON_VERSION || '3.12' }}
 
 defaults:
   run:
@@ -86,7 +100,7 @@ jobs:
       - if: needs.detect.outputs.node == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ env.NODE_V }}
       - name: Node tests
         if: needs.detect.outputs.node == 'true'
         run: |
@@ -96,7 +110,7 @@ jobs:
       - if: needs.detect.outputs.ruby == 'true'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ inputs.ruby-version }}
+          ruby-version: ${{ env.RUBY_V }}
           bundler-cache: true
       - name: Ruby tests
         if: needs.detect.outputs.ruby == 'true'
@@ -109,7 +123,7 @@ jobs:
       - if: needs.detect.outputs.python == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.PYTHON_V }}
       - name: Python tests
         if: needs.detect.outputs.python == 'true'
         run: |
@@ -126,7 +140,7 @@ jobs:
       - if: needs.detect.outputs.node == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ env.NODE_V }}
       - name: Lint (node)
         if: needs.detect.outputs.node == 'true'
         run: |
@@ -148,7 +162,7 @@ jobs:
       - if: needs.detect.outputs.node == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: ${{ env.NODE_V }}
       - name: Build (node)
         if: needs.detect.outputs.node == 'true'
         run: |
@@ -157,7 +171,7 @@ jobs:
       - if: needs.detect.outputs.gem == 'true'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: ${{ inputs.ruby-version }}
+          ruby-version: ${{ env.RUBY_V }}
           bundler-cache: true
       - name: Build (gem)
         if: needs.detect.outputs.gem == 'true'
@@ -165,7 +179,7 @@ jobs:
       - if: needs.detect.outputs.python == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.PYTHON_V }}
       - name: Build (python)
         if: needs.detect.outputs.python == 'true'
         run: |
@@ -187,7 +201,7 @@ jobs:
       - if: needs.detect.outputs.mkdocs == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.PYTHON_V }}
       - name: MkDocs strict build
         if: needs.detect.outputs.mkdocs == 'true'
         run: |
