@@ -41,6 +41,33 @@ Conventional Commits  ──►  CI gate (ci.yml)  ──►  merge to main
 Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — emits
 `node`/`ruby`/`gem`/`python`/`jekyll`/`mkdocs`/`docker` booleans + the primary `registry`.
 
+### Toolchain versions come from repository variables
+
+`ci.yml` resolves each language version as **caller input → the calling repo's
+`vars.*` → a built-in default**:
+
+| Variable | Default |
+|---|---|
+| `NODE_VERSION` | `20` |
+| `PYTHON_VERSION` | `3.12` |
+| `RUBY_VERSION` | `3.3` |
+
+The middle rung is the point: `bamr87` is a personal account, so GitHub's
+org-level variables don't exist. The dash declares the canonical values once in
+`_data/fleet.yml` (in [bamr87/bamr87](https://github.com/bamr87/bamr87)) and
+projects them onto every repo with `dash config sync --apply`, so a version bump
+reaches the whole fleet without editing ~40 workflows. Pass an explicit input
+only when one repo genuinely needs to differ.
+
+### Two gates, deliberately
+
+This `ci.yml` runs six jobs including a CodeQL matrix — the right gate for
+release-grade repos. The dash also publishes a **one-job** gate,
+`bamr87/bamr87/.github/workflows/standard-ci.yml`, for experimental and
+content repos. They are not redundant: making every repo pay for the fuller gate
+would multiply per-push runner count ~6× across the fleet. Pick by tier
+(`_data/standards.yml`).
+
 ## Adopt the standard in a repo
 
 The fastest path is the dash's rollout tool (from the monorepo root):
