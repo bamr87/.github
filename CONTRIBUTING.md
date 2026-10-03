@@ -9,7 +9,7 @@ override it with their own `CONTRIBUTING.md`.
 2. Make focused changes; keep the README current (README-first, README-last).
 3. Open a PR. **The PR title must be a [Conventional Commit](https://www.conventionalcommits.org/)** —
    it determines the next version.
-4. CI must pass. In most repos that is the shared gate
+4. CI must pass. In repos that adopt the shared gate, that is
    [`standard-ci.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/standard-ci.yml)
    in bamr87/bamr87, called from the repo's `.github/workflows/ci.yml`: it detects the stack and runs
    lint, test and build. Some repos add their own jobs or run bespoke CI; the repo's
