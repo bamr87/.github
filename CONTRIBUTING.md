@@ -9,8 +9,11 @@ override it with their own `CONTRIBUTING.md`.
 2. Make focused changes; keep the README current (README-first, README-last).
 3. Open a PR. **The PR title must be a [Conventional Commit](https://www.conventionalcommits.org/)** —
    it determines the next version.
-4. CI (the reusable [`ci.yml`](https://github.com/bamr87/.github/blob/main/.github/workflows/ci.yml) gate)
-   must pass: tests, lint, build, docs, commit-lint, CodeQL.
+4. CI must pass. In most repos that is the shared gate
+   [`standard-ci.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/standard-ci.yml)
+   in bamr87/bamr87, called from the repo's `.github/workflows/ci.yml`: it detects the stack and runs
+   lint, test and build. Some repos add their own jobs or run bespoke CI; the repo's
+   `.github/workflows/` is the source of truth for what gates a merge.
 5. Squash-merge. [release-please](https://github.com/bamr87/.github#readme) opens a **release PR** that
    bumps the version and updates `CHANGELOG.md`; merging it tags and publishes the release.
 
