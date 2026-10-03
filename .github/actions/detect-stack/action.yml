@@ -2,8 +2,8 @@ name: Detect Stack
 description: >
   Inspect the checked-out repository and emit booleans describing its
   ecosystem (node, ruby, python, jekyll, docker, mkdocs) plus the package
-  registry it most likely publishes to. Used by the reusable ci.yml and
-  publish.yml so a single pipeline adapts to any repo in the fleet.
+  registry it most likely publishes to. Used by the reusable publish.yml
+  so a single pipeline adapts to any repo in the fleet.
 
 outputs:
   node:
