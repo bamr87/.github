@@ -1,12 +1,14 @@
 # bamr87/.github — shared automation & release methodology
 
-This repository is the **single source of truth** for versioning and releases
-across every [bamr87](https://github.com/bamr87) repository. It hosts reusable
-GitHub Actions workflows, composite actions, workflow templates, and the default
-community-health files that every repo inherits.
+> Shared reusable GitHub Actions workflows, release-please setup and community health files for every bamr87 repo.
 
-It is consumed by the [bamr87 dash](https://bamr87.github.io/bamr87/) — the monorepo
-that vendors all the projects as submodules.
+[![License](https://img.shields.io/github/license/bamr87/.github)](LICENSE)
+
+## Overview
+
+This repository is the **single source of truth** for versioning and releases across every [bamr87](https://github.com/bamr87) repository. It hosts reusable GitHub Actions workflows, composite actions, workflow templates, and the default community-health files that every repo inherits.
+
+It is consumed by the [bamr87 dash](https://bamr87.github.io/bamr87/) — the monorepo that vendors all the projects as submodules.
 
 ## The methodology in one picture
 
@@ -29,8 +31,7 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 - **Releases are reviewable** — every release is a PR you can inspect before it ships.
 - **Publishing is ecosystem-aware** — one `publish.yml` detects the stack and pushes to the right registry.
 - **Quality is gated** by the shared CI gate, which lives in the dash:
-  [`bamr87/bamr87/.github/workflows/standard-ci.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/standard-ci.yml)
-  (stack-detected lint, test and build).
+[`bamr87/bamr87/.github/workflows/standard-ci.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/standard-ci.yml) (stack-detected lint, test and build).
 
 ## Reusable workflows
 
@@ -39,16 +40,11 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 | [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@main` |
 | [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets | `uses: bamr87/.github/.github/workflows/publish.yml@main` |
 
-Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — emits
-`node`/`ruby`/`gem`/`python`/`jekyll`/`mkdocs`/`docker` booleans + the primary `registry`.
+Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — emits `node`/`ruby`/`gem`/`python`/`jekyll`/`mkdocs`/`docker` booleans + the primary `registry`.
 
 ### Retired: `ci.yml`
 
-This repo used to host a six-job reusable gate, `ci.yml` (detect → test/lint/build/docs/commitlint/CodeQL),
-plus a `workflow-templates/ci.yml` caller for it. Nothing called it: on 2026-10-03 the workflow files of
-all bamr87, year-of-ai and ai-world-view repos were listed and none referenced it, while 19 repos call
-the dash's `standard-ci.yml`. It was removed to leave one shared gate. Recover it from git history if a
-fuller gate is wanted again.
+This repo used to host a six-job reusable gate, `ci.yml` (detect → test/lint/build/docs/commitlint/CodeQL), plus a `workflow-templates/ci.yml` caller for it. Nothing called it: on 2026-10-03 the workflow files of all bamr87, year-of-ai and ai-world-view repos were listed and none referenced it, while 19 repos call the dash's `standard-ci.yml`. It was removed to leave one shared gate. Recover it from git history if a fuller gate is wanted again.
 
 ## Adopt the standard in a repo
 
@@ -58,10 +54,7 @@ The fastest path is the dash's rollout tool (from the monorepo root):
 tools/adopt-release.sh <repo>     # or the /adopt-release Claude command
 ```
 
-…which scaffolds the files below. To do it by hand, copy the release caller from
-[`workflow-templates/`](workflow-templates/) and the CI caller from the dash's
-[`templates/standard-ci/ci.yml`](https://github.com/bamr87/bamr87/blob/main/templates/standard-ci/ci.yml)
-into `.github/workflows/`, and add a release-please config:
+…which scaffolds the files below. To do it by hand, copy the release caller from [`workflow-templates/`](workflow-templates/) and the CI caller from the dash's [`templates/standard-ci/ci.yml`](https://github.com/bamr87/bamr87/blob/main/templates/standard-ci/ci.yml) into `.github/workflows/`, and add a release-please config:
 
 ```
 .github/workflows/ci.yml         # → bamr87/bamr87 standard-ci.yml
@@ -81,8 +74,7 @@ release-please-config.json       # release-type: ruby | node | python | simple
 
 ## Required secrets / setup
 
-Publishing only runs when the ecosystem is detected **and** its credential exists; otherwise
-the version bump, changelog, and GitHub Release still succeed.
+Publishing only runs when the ecosystem is detected **and** its credential exists; otherwise the version bump, changelog, and GitHub Release still succeed.
 
 | Registry | Credential | Notes |
 |---|---|---|
@@ -92,8 +84,35 @@ the version bump, changelog, and GitHub Release still succeed.
 | GHCR | none | uses the built-in `GITHUB_TOKEN` |
 | CI on the release PR | `RELEASE_PLEASE_TOKEN` (optional PAT) | so the release PR triggers CI; falls back to `GITHUB_TOKEN` |
 
-Branch protection (require the CI checks before merge) is opt-in via the monorepo's
-`tools/protect-branch.sh`.
+Branch protection (require the CI checks before merge) is opt-in via the monorepo's `tools/protect-branch.sh`.
 
-See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASES.md) in the
-monorepo for the full guide.
+See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASES.md) in the monorepo for the full guide.
+
+## Project structure
+
+| Path | What it is |
+|---|---|
+| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml` |
+| `workflow-templates/` | Starter `release.yml` offered in the Actions tab of every bamr87 repo |
+| `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community health files inherited by repos that do not define their own |
+
+## Development
+
+There is no build step or test suite here. A change to a reusable workflow affects every repo that calls it, so try it from one consumer repo before merging.
+
+## Contributing
+
+Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep the CI checks green. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+
+## Changelog
+
+There is no CHANGELOG.md yet; changes are tracked in the [commit history](https://github.com/bamr87/.github/commits/main). Tagged versions are on the [releases page](https://github.com/bamr87/.github/releases).
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+---
+
+<!-- bamr87-portfolio-footer -->
+Part of the [bamr87 portfolio](https://github.com/bamr87) — browse every project on [Amr's GitHub profile](https://github.com/bamr87).
