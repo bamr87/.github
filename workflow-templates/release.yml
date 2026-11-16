@@ -1,12 +1,24 @@
 name: Release
 
+# Starter release pipeline for bamr87 repos. The hub's release-please workflow
+# (decision D3) turns Conventional Commits into a release PR; merging that PR
+# tags vX.Y.Z and creates the GitHub Release, and publish.yml then publishes to
+# every registry it detects. Needs release-please-config.json and
+# .release-please-manifest.json at the repo root. Both calls pin a major tag,
+# never a branch (UPS-WORK-10). Secrets and setup:
+# https://github.com/bamr87/.github#required-secrets--setup
+
 on:
   push:
     branches: [$default-branch]
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
