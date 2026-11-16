@@ -6,14 +6,16 @@
 
 ## What this repo is
 
-GitHub serves this repository's community-health files — `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, and the issue forms and pull request template under `.github/` — to every bamr87 repo that has no copy of its own, and offers `workflow-templates/` in every repo's Actions tab. It also hosts the reusable `release-please.yml` and `publish.yml` workflows and the `detect-stack` composite action. There is no application, build or test suite. A change is done when `actionlint` is clean, the README says what changed, and a workflow or action change has been run from one consumer repo first, because every caller pinned to `@main` gets it the moment it merges.
+GitHub serves this repository's community-health files — `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, and the issue forms and pull request template under `.github/` — to every bamr87 repo that has no copy of its own, and offers `workflow-templates/` in every repo's Actions tab. It also hosts the reusable `release-please.yml` and `publish.yml` workflows and the `detect-stack` composite action. There is no application, build or test suite; the one workflow that runs on this repo's own events is `lint.yml`, its pull-request check, which is not a reusable workflow. A change is done when the `lint` check is green (actionlint and governance_lint pass; zizmor reports without failing), the README says what changed, and a workflow or action change has been run from one consumer repo first, because every caller pinned to `@main` gets it the moment it merges.
 
 ## Stack & commands
 
 ```bash
-# This repo's only check: lint the reusable workflows (no install, build or test step)
+# This repo's checks, the ones .github/workflows/lint.yml runs on every pull request and push to main
 bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp
-/tmp/actionlint
+/tmp/actionlint .github/workflows/*.yml workflow-templates/*.yml   # must pass
+python3 <bamr87/bamr87>/tools/governance_lint.py check .           # must pass
+pipx run zizmor --offline --min-severity=medium .                   # advisory: CI shows findings, never fails on them
 # Adopt the standard in a repo, from a bamr87/bamr87 checkout (dry run; add --apply to open the PR)
 tools/fanout.sh --kit sdlc --target <repo>
 tools/fanout.sh --kit standardize --target <repo> --artifacts ci
@@ -23,7 +25,8 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 
 | Path | Holds |
 | --- | --- |
-| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml`, `publish.yml` |
+| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml`, `publish.yml`; and `lint.yml`, this repo's own pull-request check (actionlint, governance_lint, advisory zizmor), which nothing calls |
+| `.github/zizmor.yml` | zizmor settings for `lint.yml`: an action pinned to a tag passes `unpinned-uses`, matching the fleet's major-tag policy (UPS-QA-40) |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and PR template every repo without its own inherits |
 | `workflow-templates/` | Starter `release.yml` shown in every repo's Actions tab, with its `.properties.json` |
