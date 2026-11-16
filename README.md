@@ -64,6 +64,10 @@ Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — 
 
 **Status under decision D3.** The hub carries its own copy of the release logic, [`bamr87/bamr87/.github/workflows/release-please.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/release-please.yml), which the SDLC kit pins at `@v2`. The copy here keeps existing callers working until it is retired or shimmed, and the fleet standard reports a release caller of it as a UPS-REPO-21 warning during the rollout. `publish.yml` and `detect-stack` have no hub counterpart yet: a repo that publishes chains `publish.yml` off the release job's `release_created`, `tag_name` and `version` outputs.
 
+### Input checks, timeouts and concurrency
+
+`publish.yml` checks `tag` and `version` in its first job and stops the run with an `::error`, before any registry job, unless `tag` is a plain tag name (letters, digits and `. _ / @ + -`, starting with a letter or digit, such as `v1.2.3` or `name-v1.2.3`) and `version` is SemVer (`1.2.3`, `1.2.3-rc.1`). The `tag_name` and `version` outputs of release-please always pass. Inputs and registry secrets reach the shell only through `env:`, and no checkout in `publish.yml` leaves the job token in `.git/config`.
+
 ### Retired: `ci.yml`
 
 This repo used to host a six-job reusable gate, `ci.yml` (detect → test/lint/build/docs/commitlint/CodeQL), plus a `workflow-templates/ci.yml` caller for it. Nothing called it: on 2026-10-03 the workflow files of all bamr87, year-of-ai and ai-world-view repos were listed and none referenced it, while 19 repos call the dash's `standard-ci.yml`. It was removed to leave one shared gate. Recover it from git history if a fuller gate is wanted again.
