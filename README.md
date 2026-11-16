@@ -1,6 +1,6 @@
 # bamr87/.github — shared automation & release methodology
 
-> Shared reusable GitHub Actions workflows, release-please setup and community health files for every bamr87 repo.
+> The bamr87/.github repo's direction is to become the ultimate open home for all things fleet-wide GitHub automation and community health: data, tools, resources and transparency, with reusable release workflows, composite actions and inherited community-health files for every bamr87 repo ([constitution](docs/constitution.md) §1).
 
 [![License](https://img.shields.io/github/license/bamr87/.github)](LICENSE)
 

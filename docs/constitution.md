@@ -6,11 +6,17 @@
 > Agents read this before [AGENTS.md](../AGENTS.md) conventions, the [PRD](../PRD.md), or the
 > [feature catalog](../features/features.yml). Ratified by merged PR; amended only per § 8.
 
-## 1. Mission
+## 1. Missions
 
-The single source of truth for versioning and releases across bamr87 repositories: reusable GitHub Actions workflows (`release-please.yml`, `publish.yml`), composite actions, workflow templates, and default community-health files every repo inherits.
+The bamr87/.github repo's direction is to become the ultimate open home for all things fleet-wide GitHub automation and community health — data, tools, resources and transparency, gathered in one place that anyone can inspect and reuse.
 
-_Source: [PRD.md](../PRD.md)._
+1. **Provide data, tools, resources and transparency for all stakeholders, repository maintainers and practitioners, and the general public.** Owners of bamr87 repositories, and anyone adopting the same release and community-health patterns, are first-class audiences. The aim is a shared, inspectable commons: the same workflows, the same actions, and the same default files for everyone.
+2. **Be the single source of truth for versioning and releases across bamr87 repositories: reusable GitHub Actions workflows, composite actions, workflow templates, and the default community-health files every repo inherits.** release-please and publish workflows, plus issue, PR, code of conduct, contributing and security defaults, should be defined once and reused everywhere.
+3. **Make those workflows pinable, reviewable and safe to adopt: published majors, documented gates, and templates that behave the same in every inheriting repo.** Callers should be able to pin a workflow to a tag, read what it will do, and trust that community-health files stay current without each repo inventing its own.
+
+These missions set the course; they do not claim the work is finished. They serve the PRD's role for this repository as the owner-level source of release automation and inherited community health.
+
+_Source: [PRD.md](../PRD.md) §1.1._
 
 ## 2. Invariants (non-negotiable)
 

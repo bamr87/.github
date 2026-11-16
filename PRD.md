@@ -8,6 +8,22 @@
 
 The single source of truth for versioning and releases across bamr87 repositories: reusable GitHub Actions workflows (`release-please.yml`, `publish.yml`), composite actions, workflow templates, and default community-health files every repo inherits.
 
+## 1.1 Missions
+
+The bamr87/.github repo's direction is to become the ultimate open home for all things fleet-wide GitHub automation and community health — data, tools, resources and transparency, gathered in one place that anyone can inspect and reuse.
+
+1. **Provide data, tools, resources and transparency for all stakeholders, repository maintainers and practitioners, and the general public.** Owners of bamr87 repositories, and anyone adopting the same release and community-health patterns, are first-class audiences. The aim is a shared, inspectable commons: the same workflows, the same actions, and the same default files for everyone.
+2. **Be the single source of truth for versioning and releases across bamr87 repositories: reusable GitHub Actions workflows, composite actions, workflow templates, and the default community-health files every repo inherits.** release-please and publish workflows, plus issue, PR, code of conduct, contributing and security defaults, should be defined once and reused everywhere.
+3. **Make those workflows pinable, reviewable and safe to adopt: published majors, documented gates, and templates that behave the same in every inheriting repo.** Callers should be able to pin a workflow to a tag, read what it will do, and trust that community-health files stay current without each repo inventing its own.
+
+These missions set the course; they do not claim the work is finished. They serve the PRD's role for this repository as the owner-level source of release automation and inherited community health.
+
+**Requirement**
+
+- MR1: Constitution §1 states one direction statement and exactly three numbered missions, and the README and AGENTS.md taglines match that direction and link to constitution §1.
+
+Feature [DOTGITHUB-008](features/features.yml) traces to requirement MR1.
+
 ## 2. Target users
 
 - Every bamr87 repository (and its maintainers) consuming release workflows
@@ -43,12 +59,14 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | [DOTGITHUB-002](features/features.yml) | Composite actions under .github/actions/ | shipped | [`.github/actions`](.github/actions) · [`README.md`](README.md) | TBD |
 | [DOTGITHUB-003](features/features.yml) | Starter workflow workflow-templates/release.yml | shipped | [`workflow-templates/release.yml`](workflow-templates/release.yml) · [`README.md`](README.md) | TBD |
 | [DOTGITHUB-004](features/features.yml) | Issue/PR templates | shipped | [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE) · [`README.md`](README.md) | TBD |
+| [DOTGITHUB-008](features/features.yml) | Constitution missions | planned | [`docs/constitution.md`](docs/constitution.md) · [`PRD.md`](PRD.md) | MR1 |
 
 **Requirement → feature trace**
 
 | Requirement | Features |
 | --- | --- |
 | TBD | DOTGITHUB-001, DOTGITHUB-002, DOTGITHUB-003, DOTGITHUB-004 |
+| MR1 | DOTGITHUB-008 |
 <!-- features:end -->
 
 ## 5. Requirements
