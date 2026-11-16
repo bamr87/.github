@@ -59,7 +59,7 @@ jobs:
   gem:
     name: 💎 RubyGems
     needs: detect
-    if: needs.detect.outputs.gem == 'true'
+    if: needs.detect.outputs.gems == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
