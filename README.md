@@ -68,6 +68,8 @@ Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — 
 
 `publish.yml` checks `tag` and `version` in its first job and stops the run with an `::error`, before any registry job, unless `tag` is a plain tag name (letters, digits and `. _ / @ + -`, starting with a letter or digit, such as `v1.2.3` or `name-v1.2.3`) and `version` is SemVer (`1.2.3`, `1.2.3-rc.1`). The `tag_name` and `version` outputs of release-please always pass. Inputs and registry secrets reach the shell only through `env:`, and no checkout in `publish.yml` leaves the job token in `.git/config`.
 
+Every job in both workflows has a `timeout-minutes` (5 to 30). The two `release-please.yml` jobs share one concurrency queue per repository, target branch and config file, and a running job is never cancelled, so back-to-back pushes update the release PR one at a time. A caller can still set its own workflow-level `concurrency:` (for example `group: release-please-main`), as long as its group name differs from the jobs' `dotgithub-release-please-…` group: a caller workflow and a job it calls that share a group deadlock.
+
 ### Retired: `ci.yml`
 
 This repo used to host a six-job reusable gate, `ci.yml` (detect → test/lint/build/docs/commitlint/CodeQL), plus a `workflow-templates/ci.yml` caller for it. Nothing called it: on 2026-10-03 the workflow files of all bamr87, year-of-ai and ai-world-view repos were listed and none referenced it, while 19 repos call the dash's `standard-ci.yml`. It was removed to leave one shared gate. Recover it from git history if a fuller gate is wanted again.
