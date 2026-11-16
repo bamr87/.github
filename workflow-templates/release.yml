@@ -17,7 +17,7 @@ jobs:
     secrets: inherit
 
   publish:
-    need: release
+    needs: release
     if: needs.release.outputs.release_created == 'true'
     uses: bamr87/.github/.github/workflows/publish.yml@main
     with:
