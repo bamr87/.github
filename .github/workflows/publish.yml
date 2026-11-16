@@ -74,11 +74,40 @@ jobs:
             ok=false
           fi
           [[ $ok == true ]] || exit 1
+      # The caller's code, checked out first: its default clean would wipe a
+      # nested checkout made before it.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # detect-stack lives in this repository, but a reusable workflow cannot
+      # run it by a ./ path (that resolves in the caller's checkout), and a
+      # branch ref would run main's copy whatever tag the caller pinned.
+      # job.workflow_sha is the commit this workflow file runs from, so the
+      # action is checked out at that commit and run from there: a caller on
+      # @v1 gets the detection that shipped with v1. bamr87/.github is public,
+      # so the default token reads it, even from a private caller.
+      - name: Resolve this workflow's commit
+        id: self
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [[ ! $WORKFLOW_SHA =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=No workflow commit::job.workflow_sha is not a commit SHA, so detect-stack cannot run at this workflow's commit. Nothing was published."
+            exit 1
+          fi
+          echo "publish.yml runs from ${WORKFLOW_REPOSITORY}@${WORKFLOW_SHA}; detect-stack is checked out at the same commit."
+          echo "sha=$WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+      - name: Check out detect-stack at this workflow's commit
+        uses: actions/checkout@v7
+        with:
+          repository: bamr87/.github
+          ref: ${{ steps.self.outputs.sha }}
+          path: .bamr87-dotgithub
+          sparse-checkout: .github/actions
+          persist-credentials: false
       - id: s
-        uses: bamr87/.github/.github/actions/detect-stack@main
+        uses: ./.bamr87-dotgithub/.github/actions/detect-stack
 
   gem:
     name: 💎 RubyGems
