@@ -57,8 +57,10 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 
 | Workflow | Purpose | Call it with |
 |---|---|---|
-| [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@main` |
-| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets | `uses: bamr87/.github/.github/workflows/publish.yml@main` |
+| [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@v1` (new adopters: the hub's, see below) |
+| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
+
+Pin a tag, not a branch: `@v1` (floating major) or `@v1.0.0`. A caller at `@main` gets every merge here the moment it lands, and the fleet standard fails branch refs to reusable workflows (UPS-WORK-10). One known gap: `publish.yml` still runs the `detect-stack` action from `main` whatever tag you pin ([#20](https://github.com/bamr87/.github/issues/20)).
 
 Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — emits `node`/`ruby`/`gem`/`python`/`jekyll`/`mkdocs`/`docker` booleans + the primary `registry`.
 
@@ -74,7 +76,7 @@ The hub's older rollout tool, `tools/adopt-release.sh <repo>` (or the `/adopt-re
 
 ```
 .github/workflows/ci.yml         # → bamr87/bamr87 standard-ci.yml
-.github/workflows/release.yml    # → release-please.yml@main, then publish.yml@main
+.github/workflows/release.yml    # → hub release-please.yml@v2, then publish.yml@v1 (the template still says @main: #17)
 release-please-config.json       # release-type: ruby | node | python | simple
 .release-please-manifest.json    # {".": "<current version>"}
 ```
@@ -90,7 +92,7 @@ release-please-config.json       # release-type: ruby | node | python | simple
 
 ## Required secrets / setup
 
-Publishing only runs when the ecosystem is detected **and** its credential exists; otherwise the version bump, changelog, and GitHub Release still succeed.
+Each registry job runs when `detect-stack` finds its ecosystem. RubyGems and npm then check for their secret and **fail the publish job** if it is missing; PyPI and GHCR have no secret to check and always try to publish (an opt-out is tracked in [#11](https://github.com/bamr87/.github/issues/11) and [#13](https://github.com/bamr87/.github/issues/13)). The version bump, changelog and GitHub Release come from the release job, which runs first, so they are not undone by a failed publish.
 
 | Registry | Credential | Notes |
 |---|---|---|
