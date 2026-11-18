@@ -39,16 +39,24 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 
 | ID | Feature | Status | Where | Requirements |
 | --- | --- | --- | --- | --- |
-| [DOTGITHUB-001](features/features.yml) | Reusable workflows: release-please.yml, publish.yml | shipped | [`.github/workflows/release-please.yml`](.github/workflows/release-please.yml) · [`README.md`](README.md) | TBD |
+| [DOTGITHUB-001](features/features.yml) | Reusable workflows: release-please.yml, publish.yml | shipped | [`.github/workflows/release-please.yml`](.github/workflows/release-please.yml) · [`README.md`](README.md) | FR1, FR2 |
 | [DOTGITHUB-002](features/features.yml) | Composite actions under .github/actions/ | shipped | [`.github/actions`](.github/actions) · [`README.md`](README.md) | TBD |
-| [DOTGITHUB-003](features/features.yml) | Starter workflow workflow-templates/release.yml | shipped | [`workflow-templates/release.yml`](workflow-templates/release.yml) · [`README.md`](README.md) | TBD |
+| [DOTGITHUB-003](features/features.yml) | Starter workflow workflow-templates/release.yml | shipped | [`workflow-templates/release.yml`](workflow-templates/release.yml) · [`README.md`](README.md) | FR1 |
 | [DOTGITHUB-004](features/features.yml) | Issue/PR templates | shipped | [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE) · [`README.md`](README.md) | TBD |
+| [DOTGITHUB-005](features/features.yml) | detect-stack resolved at the caller's pinned ref | planned | [`.github/workflows/publish.yml`](.github/workflows/publish.yml) · [`README.md`](README.md) | FR3 |
+| [DOTGITHUB-006](features/features.yml) | Reusable PyPI build with caller-side trusted publishing | planned | [`.github/workflows/publish.yml`](.github/workflows/publish.yml) · [`README.md`](README.md) | FR4 |
+| [DOTGITHUB-007](features/features.yml) | Reusable-workflow self-test with publish dry-run | planned | [`.github/workflows/publish.yml`](.github/workflows/publish.yml) · [`README.md`](README.md) | FR5 |
 
 **Requirement → feature trace**
 
 | Requirement | Features |
 | --- | --- |
-| TBD | DOTGITHUB-001, DOTGITHUB-002, DOTGITHUB-003, DOTGITHUB-004 |
+| FR1 | DOTGITHUB-001, DOTGITHUB-003 |
+| FR2 | DOTGITHUB-001 |
+| TBD | DOTGITHUB-002, DOTGITHUB-004 |
+| FR3 | DOTGITHUB-005 |
+| FR4 | DOTGITHUB-006 |
+| FR5 | DOTGITHUB-007 |
 <!-- features:end -->
 
 ## 5. Requirements
@@ -57,6 +65,12 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 
 - FR1: Consumers select `release-type` by ecosystem
 - FR2: Required secrets documented in README
+
+**Functional — planned (deep dive 2026-11-13)**
+
+- FR3: A caller pinned to a tag of `publish.yml` runs the `detect-stack` action from the same commit, not from `main` ([#20](https://github.com/bamr87/.github/issues/20)) — DOTGITHUB-005
+- FR4: A Python caller can publish to PyPI with trusted publishing using the shared build plus a small caller-side upload job, without copying build logic ([#21](https://github.com/bamr87/.github/issues/21)) — DOTGITHUB-006
+- FR5: A change to a reusable workflow or action is exercised against fixture projects on the pull request, with no registry uploads, before it reaches callers ([#22](https://github.com/bamr87/.github/issues/22)) — DOTGITHUB-007
 
 **Non-functional**
 
