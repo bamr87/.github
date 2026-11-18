@@ -28,6 +28,10 @@ on:
       version:
         type: string
         required: true
+      pypi:
+        description: Run the PyPI job. Set false when the caller does not publish to PyPI or uploads from its own top-level job (PyPI trusted publishing cannot target a reusable workflow).
+        type: boolean
+        default: true
     secrets:
       RUBYGEMS_API_KEY:
         required: false
@@ -202,7 +206,7 @@ jobs:
   pypi:
     name: 🐍 PyPI
     needs: detect
-    if: needs.detect.outputs.python == 'true'
+    if: inputs.pypi && needs.detect.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

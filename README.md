@@ -60,7 +60,7 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 | Workflow | Purpose | Call it with |
 |---|---|---|
 | [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@v1` (new adopters: the hub's, see below) |
-| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
+| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets (`pypi: false` skips PyPI) | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
 
 Pin a tag, not a branch: `@v1` (floating major) or `@v1.0.0`. A caller at `@main` gets every merge here the moment it lands, and the fleet standard fails branch refs to reusable workflows (UPS-WORK-10). One known gap: `publish.yml` still runs the `detect-stack` action from `main` whatever tag you pin ([#20](https://github.com/bamr87/.github/issues/20)).
 
@@ -108,9 +108,21 @@ Each registry job runs when `detect-stack` finds its ecosystem. RubyGems and npm
 |---|---|---|
 | RubyGems | `RUBYGEMS_API_KEY` (repo secret) | |
 | npm | `NPM_TOKEN` (repo secret) | published with provenance |
-| PyPI | none | **trusted publishing** (OIDC) — configure the publisher on PyPI |
+| PyPI | none | **trusted publishing** (OIDC) — configure the publisher on PyPI; see the `pypi` input below |
 | GHCR | none | uses the built-in `GITHUB_TOKEN` |
 | CI on the release PR | `RELEASE_PLEASE_TOKEN` (optional PAT) | so the release PR triggers CI; falls back to `GITHUB_TOKEN` |
+
+**Turning the PyPI job off.** `publish.yml` takes an optional boolean input `pypi` (default `true`). PyPI trusted publishing cannot name a reusable workflow as its publisher, so a reusable `🐍 PyPI` job fails with `invalid-publisher`. A repo that publishes to PyPI uploads from its own top-level job in its `release.yml` and passes `pypi: false`, and a repo whose `pyproject.toml` only holds tool settings passes it too; the job then shows as skipped. Callers that omit the input behave as before.
+
+```yaml
+    publish:
+      uses: bamr87/.github/.github/workflows/publish.yml@v1
+      with:
+        tag: ${{ needs.release.outputs.tag_name }}
+        version: ${{ needs.release.outputs.version }}
+        pypi: false   # this repo uploads to PyPI from its own job, or doesn't publish there
+      secrets: inherit
+```
 
 Branch protection (require the CI checks before merge) is opt-in via the monorepo's `tools/protect-branch.sh`.
 
