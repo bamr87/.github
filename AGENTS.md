@@ -6,14 +6,16 @@
 
 ## What this repo is
 
-GitHub serves this repository's community-health files — `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, and the issue forms and pull request template under `.github/` — to every bamr87 repo that has no copy of its own, and offers `workflow-templates/` in every repo's Actions tab. It also hosts the reusable `release-please.yml` and `publish.yml` workflows and the `detect-stack` composite action. There is no application, build or test suite. A change is done when `actionlint` is clean, the README says what changed, and a workflow or action change has been run from one consumer repo first, because every caller pinned to `@main` gets it the moment it merges.
+GitHub serves this repository's community-health files — `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, and the issue forms and pull request template under `.github/` — to every bamr87 repo that has no copy of its own, and offers `workflow-templates/` in every repo's Actions tab. It also hosts the reusable `release-please.yml` and `publish.yml` workflows and the `detect-stack` composite action. There is no application, build or test suite; the one workflow that runs on this repo's own events is `lint.yml`, its pull-request check, which is not a reusable workflow. A change is done when the `lint` check is green (actionlint and governance_lint pass; zizmor reports without failing), the README says what changed, and a workflow or action change has been run from one consumer repo first, because every caller pinned to `@main` gets it the moment it merges.
 
 ## Stack & commands
 
 ```bash
-# This repo's only check: lint the reusable workflows (no install, build or test step)
+# This repo's checks, the ones .github/workflows/lint.yml runs on every pull request and push to main
 bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp
-/tmp/actionlint
+/tmp/actionlint .github/workflows/*.yml workflow-templates/*.yml   # must pass
+python3 <bamr87/bamr87>/tools/governance_lint.py check .           # must pass
+pipx run zizmor --offline --min-severity=medium .                   # advisory: CI shows findings, never fails on them
 # Adopt the standard in a repo, from a bamr87/bamr87 checkout (dry run; add --apply to open the PR)
 tools/fanout.sh --kit sdlc --target <repo>
 tools/fanout.sh --kit standardize --target <repo> --artifacts ci
@@ -23,9 +25,12 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 
 | Path | Holds |
 | --- | --- |
-| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml`, `publish.yml` |
+| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml`, `publish.yml`; and `lint.yml`, this repo's own pull-request check (actionlint, governance_lint, advisory zizmor), which nothing calls |
+| `.github/zizmor.yml` | zizmor settings for `lint.yml`: an action pinned to a tag passes `unpinned-uses`, matching the fleet's major-tag policy (UPS-QA-40) |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and PR template every repo without its own inherits |
+| `.github/dependabot.yml` | Dependabot `github-actions` updates for the reusable workflows (community kit, UPS-QA-41); not inherited by other repos |
+| `.github/actionlint.yaml` | actionlint settings: one ignore scoped to `publish.yml` for the `job.workflow_*` properties actionlint does not know yet; remove it when a release does |
 | `workflow-templates/` | Starter `release.yml` shown in every repo's Actions tab, with its `.properties.json` |
 | `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community-health files |
 
@@ -41,7 +46,7 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 
 ## Shared-file rules
 
-- A reusable workflow or action change reaches every `@main` caller on merge, and `publish.yml` itself calls `detect-stack@main`. Keep `workflow_call` inputs, outputs and secrets backward compatible.
+- A reusable workflow or action change reaches every `@main` caller on merge. `publish.yml` runs `detect-stack` from its own commit (it checks the action out at `job.workflow_sha`), so a caller pinned to a tag or SHA keeps the detection that shipped with it, and an action change reaches `@v1` callers only when `v1` moves. Keep `workflow_call` inputs, outputs and secrets backward compatible.
 - A repo's own community-health file replaces the inherited one wholesale; nothing merges. Keep the defaults fleet-generic.
 - The fleet source for the community-health files is the hub's community kit (`templates/community/`, which carries the fleet Definition of Done block). Syncing it into this repo is a Fleet Ops change; don't fork the wording here.
 - Decision D3: shared workflows live in the hub. The CI gate is the hub's `standard-ci.yml` (this repo's `ci.yml` was retired), and the hub carries its own `release-please.yml`, which the SDLC kit pins at `@v2`. This repo's `release-please.yml` keeps existing callers working until it is retired or shimmed; a release caller of it is a UPS-REPO-21 failure reported as a warning during the rollout. `publish.yml` and `detect-stack` have no hub counterpart yet.
