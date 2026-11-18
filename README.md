@@ -21,12 +21,14 @@ Under the fleet's decision D3, shared workflows are moving to the hub: the CI ga
 
 ## Quick start
 
-Nothing to install: a repo picks up the community-health defaults automatically. The block lints this repo's workflows, then adopts the release and CI standard in another repo from a [bamr87/bamr87](https://github.com/bamr87/bamr87) checkout:
+Nothing to install: a repo picks up the community-health defaults automatically. The block runs this repo's checks, the same ones CI runs, then adopts the release and CI standard in another repo from a [bamr87/bamr87](https://github.com/bamr87/bamr87) checkout:
 
 ```bash
-# This repo's only check: lint the reusable workflows (no install, build or test step)
+# This repo's checks, the ones .github/workflows/lint.yml runs on every pull request and push to main
 bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp
-/tmp/actionlint
+/tmp/actionlint .github/workflows/*.yml workflow-templates/*.yml   # must pass
+python3 <bamr87/bamr87>/tools/governance_lint.py check .           # must pass
+pipx run zizmor --offline --min-severity=medium .                   # advisory: CI shows findings, never fails on them
 # Adopt the standard in a repo, from a bamr87/bamr87 checkout (dry run; add --apply to open the PR)
 tools/fanout.sh --kit sdlc --target <repo>
 tools/fanout.sh --kit standardize --target <repo> --artifacts ci
@@ -118,7 +120,8 @@ See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASE
 
 | Path | What it is |
 |---|---|
-| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml` |
+| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml`; plus `lint.yml`, this repo's own pull-request check, which nothing calls |
+| `.github/zizmor.yml` | zizmor settings for `lint.yml`: an action pinned to a tag passes `unpinned-uses`, matching the fleet's major-tag policy (UPS-QA-40) |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and pull request template |
 | `.github/dependabot.yml` | Weekly, grouped Dependabot PRs that move the actions the reusable workflows use to their newest release (the hub's community kit, UPS-QA-41) |
@@ -128,11 +131,11 @@ See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASE
 
 ## Development
 
-There is no build step or test suite here; `actionlint` (in [Quick start](#quick-start)) is the only check. A change to a reusable workflow affects every repo that calls it at `@main`, so try it from one consumer repo before merging. Conventions and the rules for changing inherited files live in [AGENTS.md](AGENTS.md).
+There is no build step or test suite here. [`lint.yml`](.github/workflows/lint.yml) checks every pull request and every push to `main`; it is this repo's own check, not a reusable workflow, and it runs no schedule and reads no secrets. actionlint (the reusable workflows and the starter template) and the hub's `governance_lint.py` (constitution, amendments, PRD and feature catalog) must pass. zizmor audits the workflows and the composite action and reports its findings as annotations without failing the check. [Quick start](#quick-start) runs the same three checks locally. A change to a reusable workflow affects every repo that calls it at `@main`, so try it from one consumer repo before merging. Conventions and the rules for changing inherited files live in [AGENTS.md](AGENTS.md).
 
 ## Contributing
 
-Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep `actionlint` clean. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow; AI agents start with [AGENTS.md](AGENTS.md).
+Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep the `lint` check green. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow; AI agents start with [AGENTS.md](AGENTS.md).
 
 ## Changelog
 
