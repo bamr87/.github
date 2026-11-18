@@ -16,6 +16,7 @@ name: 📦 publish (reusable)
 #         version: ${{ needs.release.outputs.version }}
 #       secrets: inherit
 #
+# The PyPI and GHCR jobs have switches (`pypi: false`, `ghcr: false`).
 # A registry job is a no-op (skipped) when that ecosystem isn't detected, and
 # fails loudly only when the ecosystem IS present but its credential is missing.
 
@@ -30,6 +31,10 @@ on:
         required: true
       pypi:
         description: Run the PyPI job. Set false when the caller does not publish to PyPI or uploads from its own top-level job (PyPI trusted publishing cannot target a reusable workflow).
+        type: boolean
+        default: true
+      ghcr:
+        description: Push a container image to GHCR. Set false when the Dockerfile is only for development or testing and a release must not publish an image.
         type: boolean
         default: true
     secrets:
@@ -198,10 +203,21 @@ jobs:
           fi
       - run: npm ci || npm install
       - run: npm run build --if-present
+      # Provenance needs a public source repository: npm rejects it from a
+      # private one. In a reusable workflow github.event.repository is the
+      # caller's repository, so this reads the right one.
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          args=(--access public)
+          if [[ $REPO_PRIVATE == false ]]; then
+            args+=(--provenance)
+          else
+            echo "Source repository is not public: publishing without provenance."
+          fi
+          npm publish "${args[@]}"
 
   pypi:
     name: 🐍 PyPI
@@ -230,7 +246,7 @@ jobs:
   ghcr:
     name: 🐳 GHCR
     needs: detect
-    if: needs.detect.outputs.docker == 'true'
+    if: inputs.ghcr && needs.detect.outputs.docker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -240,6 +256,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      # QEMU registers the emulators the arm64 leg of a RUN step needs on an
+      # amd64 runner; it must run before buildx.
+      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -252,7 +271,13 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "tags=${repo}:${VERSION},${repo}:latest" >> "$GITHUB_OUTPUT"
+          tags="${repo}:${VERSION}"
+          # A pre-release (1.2.0-rc.1) has a "-" suffix and must not move latest.
+          # The detect job has already checked VERSION is SemVer.
+          if [[ $VERSION != *-* ]]; then
+            tags+=",${repo}:latest"
+          fi
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v7
         with:
           context: .

@@ -60,7 +60,7 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 | Workflow | Purpose | Call it with |
 |---|---|---|
 | [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@v1` (new adopters: the hub's, see below) |
-| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets (`pypi: false` skips PyPI) | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
+| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets (`pypi: false` skips PyPI, `ghcr: false` skips the image push) | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
 
 Pin a tag, not a branch: `@v1` (floating major) or `@v1.0.0`. A caller at `@main` gets every merge here the moment it lands, and the fleet standard fails branch refs to reusable workflows (UPS-WORK-10). One known gap: `publish.yml` still runs the `detect-stack` action from `main` whatever tag you pin ([#20](https://github.com/bamr87/.github/issues/20)).
 
