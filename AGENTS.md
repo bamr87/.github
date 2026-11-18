@@ -26,6 +26,7 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 | `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml`, `publish.yml` |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and PR template every repo without its own inherits |
+| `.github/dependabot.yml` | Dependabot `github-actions` updates for the reusable workflows (community kit, UPS-QA-41); not inherited by other repos |
 | `workflow-templates/` | Starter `release.yml` shown in every repo's Actions tab, with its `.properties.json` |
 | `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community-health files |
 

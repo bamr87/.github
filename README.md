@@ -119,6 +119,7 @@ See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASE
 | `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml` |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and pull request template |
+| `.github/dependabot.yml` | Weekly, grouped Dependabot PRs that move the actions the reusable workflows use to their newest release (the hub's community kit, UPS-QA-41) |
 | `workflow-templates/` | Starter `release.yml` offered in the Actions tab of every bamr87 repo |
 | `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community health files inherited by repos that do not define their own |
 
