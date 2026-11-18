@@ -21,12 +21,14 @@ Under the fleet's decision D3, shared workflows are moving to the hub: the CI ga
 
 ## Quick start
 
-Nothing to install: a repo picks up the community-health defaults automatically. The block lints this repo's workflows, then adopts the release and CI standard in another repo from a [bamr87/bamr87](https://github.com/bamr87/bamr87) checkout:
+Nothing to install: a repo picks up the community-health defaults automatically. The block runs this repo's checks, the same ones CI runs, then adopts the release and CI standard in another repo from a [bamr87/bamr87](https://github.com/bamr87/bamr87) checkout:
 
 ```bash
-# This repo's only check: lint the reusable workflows (no install, build or test step)
+# This repo's checks, the ones .github/workflows/lint.yml runs on every pull request and push to main
 bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest /tmp
-/tmp/actionlint
+/tmp/actionlint .github/workflows/*.yml workflow-templates/*.yml   # must pass
+python3 <bamr87/bamr87>/tools/governance_lint.py check .           # must pass
+pipx run zizmor --offline --min-severity=medium .                   # advisory: CI shows findings, never fails on them
 # Adopt the standard in a repo, from a bamr87/bamr87 checkout (dry run; add --apply to open the PR)
 tools/fanout.sh --kit sdlc --target <repo>
 tools/fanout.sh --kit standardize --target <repo> --artifacts ci
@@ -57,12 +59,22 @@ Conventional Commits  ──►  CI gate (standard-ci.yml)  ──►  merge to 
 
 | Workflow | Purpose | Call it with |
 |---|---|---|
-| [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@main` |
-| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets (`pypi: false` skips PyPI) | `uses: bamr87/.github/.github/workflows/publish.yml@main` |
+| [`release-please.yml`](.github/workflows/release-please.yml) | Version bump + CHANGELOG + GitHub Release | `uses: bamr87/.github/.github/workflows/release-please.yml@v1` (new adopters: the hub's, see below) |
+| [`publish.yml`](.github/workflows/publish.yml) | Publish to gem / npm / PyPI / GHCR + attach assets (`pypi: false` skips PyPI) | `uses: bamr87/.github/.github/workflows/publish.yml@v1` |
+
+Pin a tag, not a branch: `@v1` (floating major) or `@v1.0.0`. A caller at `@main` gets every merge here the moment it lands, and the fleet standard fails branch refs to reusable workflows (UPS-WORK-10). One known gap: `publish.yml` still runs the `detect-stack` action from `main` whatever tag you pin ([#20](https://github.com/bamr87/.github/issues/20)).
 
 Composite action: [`detect-stack`](.github/actions/detect-stack/action.yml) — emits `node`/`ruby`/`gem`/`python`/`jekyll`/`mkdocs`/`docker` booleans + the primary `registry`.
 
 **Status under decision D3.** The hub carries its own copy of the release logic, [`bamr87/bamr87/.github/workflows/release-please.yml`](https://github.com/bamr87/bamr87/blob/main/.github/workflows/release-please.yml), which the SDLC kit pins at `@v2`. The copy here keeps existing callers working until it is retired or shimmed, and the fleet standard reports a release caller of it as a UPS-REPO-21 warning during the rollout. `publish.yml` and `detect-stack` have no hub counterpart yet: a repo that publishes chains `publish.yml` off the release job's `release_created`, `tag_name` and `version` outputs.
+
+### Pinning, input checks, timeouts and concurrency
+
+`publish.yml` runs `detect-stack` from its own commit: the detect job checks out this repository's `.github/actions` at `job.workflow_sha`, the commit the caller's ref resolved to, and runs the action from there. A caller pinned to `@v1` or a full SHA therefore gets the detection that shipped with that ref, not whatever is on `main`. The checkout reads this public repository with the default token, so a private caller needs nothing extra.
+
+`publish.yml` checks `tag` and `version` in its first job and stops the run with an `::error`, before any registry job, unless `tag` is a plain tag name (letters, digits and `. _ / @ + -`, starting with a letter or digit, such as `v1.2.3` or `name-v1.2.3`) and `version` is SemVer (`1.2.3`, `1.2.3-rc.1`). The `tag_name` and `version` outputs of release-please always pass. Inputs and registry secrets reach the shell only through `env:`, and no checkout in `publish.yml` leaves the job token in `.git/config`.
+
+Every job in both workflows has a `timeout-minutes` (5 to 30). The two `release-please.yml` jobs share one concurrency queue per repository, target branch and config file, and a running job is never cancelled, so back-to-back pushes update the release PR one at a time. A caller can still set its own workflow-level `concurrency:` (for example `group: release-please-main`), as long as its group name differs from the jobs' `dotgithub-release-please-…` group: a caller workflow and a job it calls that share a group deadlock.
 
 ### Retired: `ci.yml`
 
@@ -74,7 +86,7 @@ The hub's older rollout tool, `tools/adopt-release.sh <repo>` (or the `/adopt-re
 
 ```
 .github/workflows/ci.yml         # → bamr87/bamr87 standard-ci.yml
-.github/workflows/release.yml    # → release-please.yml@main, then publish.yml@main
+.github/workflows/release.yml    # → hub release-please.yml@v2, then publish.yml@v1 (the template still says @main: #17)
 release-please-config.json       # release-type: ruby | node | python | simple
 .release-please-manifest.json    # {".": "<current version>"}
 ```
@@ -90,7 +102,7 @@ release-please-config.json       # release-type: ruby | node | python | simple
 
 ## Required secrets / setup
 
-Publishing only runs when the ecosystem is detected **and** its credential exists; otherwise the version bump, changelog, and GitHub Release still succeed.
+Each registry job runs when `detect-stack` finds its ecosystem. RubyGems and npm then check for their secret and **fail the publish job** if it is missing; PyPI and GHCR have no secret to check and always try to publish (an opt-out is tracked in [#11](https://github.com/bamr87/.github/issues/11) and [#13](https://github.com/bamr87/.github/issues/13)). The version bump, changelog and GitHub Release come from the release job, which runs first, so they are not undone by a failed publish.
 
 | Registry | Credential | Notes |
 |---|---|---|
@@ -120,19 +132,22 @@ See [`docs/RELEASES.md`](https://github.com/bamr87/bamr87/blob/main/docs/RELEASE
 
 | Path | What it is |
 |---|---|
-| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml` |
+| `.github/workflows/` | Reusable workflows called by other repos: `release-please.yml` and `publish.yml`; plus `lint.yml`, this repo's own pull-request check, which nothing calls |
+| `.github/zizmor.yml` | zizmor settings for `lint.yml`: an action pinned to a tag passes `unpinned-uses`, matching the fleet's major-tag policy (UPS-QA-40) |
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and pull request template |
+| `.github/dependabot.yml` | Weekly, grouped Dependabot PRs that move the actions the reusable workflows use to their newest release (the hub's community kit, UPS-QA-41) |
+| `.github/actionlint.yaml` | actionlint settings: one ignore, scoped to `publish.yml`, for the `job.workflow_sha` / `job.workflow_repository` properties actionlint 1.7.12 does not know yet |
 | `workflow-templates/` | Starter `release.yml` offered in the Actions tab of every bamr87 repo |
 | `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community health files inherited by repos that do not define their own |
 
 ## Development
 
-There is no build step or test suite here; `actionlint` (in [Quick start](#quick-start)) is the only check. A change to a reusable workflow affects every repo that calls it at `@main`, so try it from one consumer repo before merging. Conventions and the rules for changing inherited files live in [AGENTS.md](AGENTS.md).
+There is no build step or test suite here. [`lint.yml`](.github/workflows/lint.yml) checks every pull request and every push to `main`; it is this repo's own check, not a reusable workflow, and it runs no schedule and reads no secrets. actionlint (the reusable workflows and the starter template) and the hub's `governance_lint.py` (constitution, amendments, PRD and feature catalog) must pass. zizmor audits the workflows and the composite action and reports its findings as annotations without failing the check. [Quick start](#quick-start) runs the same three checks locally. A change to a reusable workflow affects every repo that calls it at `@main`, so try it from one consumer repo before merging. Conventions and the rules for changing inherited files live in [AGENTS.md](AGENTS.md).
 
 ## Contributing
 
-Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep `actionlint` clean. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow; AI agents start with [AGENTS.md](AGENTS.md).
+Contributions are welcome via pull request. Use [Conventional Commits](https://www.conventionalcommits.org/) and keep the `lint` check green. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow; AI agents start with [AGENTS.md](AGENTS.md).
 
 ## Changelog
 

@@ -22,7 +22,7 @@ features:
     description: "Reusable workflows: `release-please.yml`, `publish.yml`"
     implemented: true
     status: shipped
-    prd: [TBD]
+    prd: [FR1, FR2]
     surface: infra
     link: ".github/workflows/release-please.yml"
     docs: "README.md"
@@ -32,7 +32,7 @@ features:
     implemented: true
     status: shipped
     prd: [TBD]
-    surface: ui
+    surface: infra
     link: ".github/actions"
     docs: "README.md"
   - id: DOTGITHUB-003
@@ -40,7 +40,7 @@ features:
     description: "Starter workflow `workflow-templates/release.yml`"
     implemented: true
     status: shipped
-    prd: [TBD]
+    prd: [FR1]
     surface: infra
     link: "workflow-templates/release.yml"
     docs: "README.md"
@@ -53,3 +53,33 @@ features:
     surface: infra
     link: ".github/ISSUE_TEMPLATE"
     docs: "README.md"
+  - id: DOTGITHUB-005
+    title: "detect-stack resolved at the caller's pinned ref"
+    description: "publish.yml checks out detect-stack at `job.workflow_sha`, so a caller pinned to `@v1` runs the matching detection instead of `main`'s (deep dive 2026-11-13, #20)."
+    implemented: false
+    status: planned
+    prd: [FR3]
+    surface: infra
+    link: ".github/workflows/publish.yml"
+    docs: "README.md"
+    provenance: { issue: "https://github.com/bamr87/.github/issues/20" }
+  - id: DOTGITHUB-006
+    title: "Reusable PyPI build with caller-side trusted publishing"
+    description: "A reusable job builds and checks the Python distributions as an artifact; a small caller-side job uploads them with PyPI trusted publishing, which does not accept a reusable workflow as publisher (deep dive 2026-11-13, #21)."
+    implemented: false
+    status: planned
+    prd: [FR4]
+    surface: infra
+    link: ".github/workflows/publish.yml"
+    docs: "README.md"
+    provenance: { issue: "https://github.com/bamr87/.github/issues/21" }
+  - id: DOTGITHUB-007
+    title: "Reusable-workflow self-test with publish dry-run"
+    description: "PR-triggered self-test that runs detect-stack and publish.yml (dry-run, no uploads) against fixture projects, so a broken workflow fails before it reaches callers (deep dive 2026-11-13, #22)."
+    implemented: false
+    status: planned
+    prd: [FR5]
+    surface: infra
+    link: ".github/workflows/publish.yml"
+    docs: "README.md"
+    provenance: { issue: "https://github.com/bamr87/.github/issues/22" }

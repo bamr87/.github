@@ -1,0 +1,14 @@
+# zizmor settings for this repo's lint check (.github/workflows/lint.yml).
+#
+# The fleet references actions at a version tag such as `@v7`, which Dependabot
+# moves, rather than at a commit SHA (bamr87/bamr87 specs/QUALITY.md UPS-QA-40).
+# zizmor's default `unpinned-uses` policy asks for a SHA on every action, which
+# would report every `uses:` line here. `ref-pin` accepts any tag, branch or SHA
+# (a `docker://` image still needs a tag). It does not tell a tag from a branch:
+# a branch ref such as `@main` is the fleet conformance check's finding
+# (UPS-WORK-10, UPS-QA-40), not zizmor's.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": ref-pin

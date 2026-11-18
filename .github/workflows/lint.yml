@@ -1,0 +1,79 @@
+name: 🧹 lint
+
+# This repo's own check, not a reusable workflow: nothing calls it, and GitHub
+# does not hand a .github repo's workflows down to other repos. It lints what
+# callers run before it merges, because a change here reaches every @main
+# caller on merge and every @v1 caller on the next tag move.
+#
+#   actionlint       the reusable workflows and the starter template, with
+#                    shellcheck on every run: block. Fails the job.
+#   governance_lint  bamr87/bamr87's tools/governance_lint.py at the hub's v2
+#                    tag: constitution, amendments, PRD and feature catalog
+#                    agree. Fails the job.
+#   zizmor           security audit of the workflows and the composite action,
+#                    configured by .github/zizmor.yml. Advisory: findings are
+#                    annotations and never fail the job (--no-exit-codes); drop
+#                    that flag to make zizmor blocking.
+#
+# Every check runs even when an earlier one fails, so one run reports them all.
+# Pull requests and pushes to main only: no schedule, no secrets, and a
+# read-only token that no checkout keeps.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ vars.PYTHON_VERSION || '3.12' }}
+
+      - name: Install PyYAML (for governance_lint) and zizmor
+        run: python -m pip install --quiet --upgrade pyyaml zizmor
+
+      - name: Download actionlint
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/download-actionlint.bash" \
+            https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash
+          bash "$RUNNER_TEMP/download-actionlint.bash" latest "$RUNNER_TEMP"
+
+      - name: Check out governance_lint.py from bamr87/bamr87 at v2
+        uses: actions/checkout@v7
+        with:
+          repository: bamr87/bamr87
+          ref: v2
+          path: .fleet-hub
+          sparse-checkout: tools/governance_lint.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: actionlint
+        if: ${{ !cancelled() }}
+        run: |
+          shopt -s nullglob
+          "$RUNNER_TEMP/actionlint" -color .github/workflows/*.{yml,yaml} workflow-templates/*.{yml,yaml}
+
+      - name: governance_lint
+        if: ${{ !cancelled() }}
+        run: python .fleet-hub/tools/governance_lint.py check .
+
+      - name: zizmor (advisory)
+        if: ${{ !cancelled() }}
+        run: zizmor --offline --no-progress --format=github --min-severity=medium --no-exit-codes .
