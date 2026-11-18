@@ -7,6 +7,12 @@ name: 🎯 release-please (reusable)
 # vX.Y.Z and creates the GitHub Release. Callers chain publish.yml off the
 # `release_created` output (same run, so no PAT is needed to trigger it).
 #
+# New adopters call the hub's copy instead (decision D3), as the starter
+# workflow-templates/release.yml does:
+#   uses: bamr87/bamr87/.github/workflows/release-please.yml@v2
+# This copy keeps existing callers working until it is retired or shimmed.
+# They pin a tag, never a branch (UPS-WORK-10):
+#
 #   jobs:
 #     release:
 #       uses: bamr87/.github/.github/workflows/release-please.yml@v1

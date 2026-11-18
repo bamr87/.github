@@ -6,7 +6,7 @@ name: 📦 publish (reusable)
 #
 #   jobs:
 #     release:
-#       uses: bamr87/.github/.github/workflows/release-please.yml@v1
+#       uses: bamr87/bamr87/.github/workflows/release-please.yml@v2
 #     publish:
 #       needs: release
 #       if: needs.release.outputs.release_created == 'true'
