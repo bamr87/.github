@@ -74,7 +74,6 @@ Every user-facing capability has a stable id in the feature catalog [`features/f
 | FR3 | DOTGITHUB-005 |
 | FR4 | DOTGITHUB-006 |
 | FR5 | DOTGITHUB-007 |
-| TBD | DOTGITHUB-001, DOTGITHUB-002, DOTGITHUB-003, DOTGITHUB-004 |
 | MR1 | DOTGITHUB-008 |
 <!-- features:end -->
 
