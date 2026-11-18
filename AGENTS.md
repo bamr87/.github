@@ -27,6 +27,7 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 | `.github/actions/detect-stack/` | Composite action `publish.yml` uses to pick the registry |
 | `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` | Default issue forms and PR template every repo without its own inherits |
 | `.github/dependabot.yml` | Dependabot `github-actions` updates for the reusable workflows (community kit, UPS-QA-41); not inherited by other repos |
+| `.github/actionlint.yaml` | actionlint settings: one ignore scoped to `publish.yml` for the `job.workflow_*` properties actionlint does not know yet; remove it when a release does |
 | `workflow-templates/` | Starter `release.yml` shown in every repo's Actions tab, with its `.properties.json` |
 | `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md` | Default community-health files |
 
@@ -42,7 +43,7 @@ tools/fanout.sh --kit standardize --target <repo> --artifacts ci
 
 ## Shared-file rules
 
-- A reusable workflow or action change reaches every `@main` caller on merge, and `publish.yml` itself calls `detect-stack@main`. Keep `workflow_call` inputs, outputs and secrets backward compatible.
+- A reusable workflow or action change reaches every `@main` caller on merge. `publish.yml` runs `detect-stack` from its own commit (it checks the action out at `job.workflow_sha`), so a caller pinned to a tag or SHA keeps the detection that shipped with it, and an action change reaches `@v1` callers only when `v1` moves. Keep `workflow_call` inputs, outputs and secrets backward compatible.
 - A repo's own community-health file replaces the inherited one wholesale; nothing merges. Keep the defaults fleet-generic.
 - The fleet source for the community-health files is the hub's community kit (`templates/community/`, which carries the fleet Definition of Done block). Syncing it into this repo is a Fleet Ops change; don't fork the wording here.
 - Decision D3: shared workflows live in the hub. The CI gate is the hub's `standard-ci.yml` (this repo's `ci.yml` was retired), and the hub carries its own `release-please.yml`, which the SDLC kit pins at `@v2`. This repo's `release-please.yml` keeps existing callers working until it is retired or shimmed; a release caller of it is a UPS-REPO-21 failure reported as a warning during the rollout. `publish.yml` and `detect-stack` have no hub counterpart yet.
