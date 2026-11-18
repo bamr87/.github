@@ -6,11 +6,11 @@ name: 📦 publish (reusable)
 #
 #   jobs:
 #     release:
-#       uses: bamr87/.github/.github/workflows/release-please.yml@main
+#       uses: bamr87/.github/.github/workflows/release-please.yml@v1
 #     publish:
 #       needs: release
 #       if: needs.release.outputs.release_created == 'true'
-#       uses: bamr87/.github/.github/workflows/publish.yml@main
+#       uses: bamr87/.github/.github/workflows/publish.yml@v1
 #       with:
 #         tag: ${{ needs.release.outputs.tag_name }}
 #         version: ${{ needs.release.outputs.version }}
@@ -28,6 +28,10 @@ on:
       version:
         type: string
         required: true
+      pypi:
+        description: Run the PyPI job. Set false when the caller does not publish to PyPI or uploads from its own top-level job (PyPI trusted publishing cannot target a reusable workflow).
+        type: boolean
+        default: true
     secrets:
       RUBYGEMS_API_KEY:
         required: false
@@ -45,6 +49,7 @@ jobs:
   detect:
     name: 🔍 Detect targets
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       gem: ${{ steps.s.outputs.gem }}
       node: ${{ steps.s.outputs.node }}
@@ -52,19 +57,74 @@ jobs:
       docker: ${{ steps.s.outputs.docker }}
       registry: ${{ steps.s.outputs.registry }}
     steps:
-      - uses: actions/checkout@v4
+      # Every registry job needs this one, so a malformed tag or version stops
+      # the run here, before anything is published. Both reach the shell only
+      # through env:, and their raw values are never echoed: a newline in
+      # either would otherwise start a new workflow command or output line.
+      - name: Validate tag and version
+        env:
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          tag_re='^[A-Za-z0-9][A-Za-z0-9._/@+-]*$'
+          version_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
+          ok=true
+          if [[ ! $TAG =~ $tag_re ]]; then
+            echo "::error title=Invalid tag::inputs.tag must be a plain tag name such as v1.2.3 or name-v1.2.3 (pattern $tag_re). Nothing was published."
+            ok=false
+          fi
+          if [[ ! $VERSION =~ $version_re ]]; then
+            echo "::error title=Invalid version::inputs.version must be a SemVer version such as 1.2.3 or 1.2.3-rc.1 (pattern $version_re). Nothing was published."
+            ok=false
+          fi
+          [[ $ok == true ]] || exit 1
+      # The caller's code, checked out first: its default clean would wipe a
+      # nested checkout made before it.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # detect-stack lives in this repository, but a reusable workflow cannot
+      # run it by a ./ path (that resolves in the caller's checkout), and a
+      # branch ref would run main's copy whatever tag the caller pinned.
+      # job.workflow_sha is the commit this workflow file runs from, so the
+      # action is checked out at that commit and run from there: a caller on
+      # @v1 gets the detection that shipped with v1. bamr87/.github is public,
+      # so the default token reads it, even from a private caller.
+      - name: Resolve this workflow's commit
+        id: self
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [[ ! $WORKFLOW_SHA =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=No workflow commit::job.workflow_sha is not a commit SHA, so detect-stack cannot run at this workflow's commit. Nothing was published."
+            exit 1
+          fi
+          echo "publish.yml runs from ${WORKFLOW_REPOSITORY}@${WORKFLOW_SHA}; detect-stack is checked out at the same commit."
+          echo "sha=$WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+      - name: Check out detect-stack at this workflow's commit
+        uses: actions/checkout@v7
+        with:
+          repository: bamr87/.github
+          ref: ${{ steps.self.outputs.sha }}
+          path: .bamr87-dotgithub
+          sparse-checkout: .github/actions
+          persist-credentials: false
       - id: s
-        uses: bamr87/.github/.github/actions/detect-stack@main
+        uses: ./.bamr87-dotgithub/.github/actions/detect-stack
 
   gem:
     name: 💎 RubyGems
     needs: detect
     if: needs.detect.outputs.gem == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -83,8 +143,11 @@ jobs:
             bundle install --jobs 4
           fi
       - name: Guard credential
+        env:
+          # A comparison, never the value: the step sees only true or false.
+          HAS_RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY != '' }}
         run: |
-          if [[ -z "${{ secrets.RUBYGEMS_API_KEY }}" ]]; then
+          if [[ $HAS_RUBYGEMS_API_KEY != true ]]; then
             echo "::error title=Missing RUBYGEMS_API_KEY::Add the secret to publish the gem."; exit 1
           fi
       - name: Build gem
@@ -98,28 +161,39 @@ jobs:
       - name: Attach assets to release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         run: |
           assets=(./*.gem)
           [[ -f install.sh ]] && assets+=(install.sh)
-          gh release upload "${{ inputs.tag }}" "${assets[@]}" --clobber
+          gh release upload "$TAG" "${assets[@]}" --clobber
 
   npm:
     name: 📦 npm
     needs: detect
     if: needs.detect.outputs.registry == 'npm'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write   # npm provenance
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+          # setup-node v5+ turns caching on by itself when package.json has a
+          # packageManager field, and that step fails without a lockfile (the
+          # fleet commits none). Keep v4's behaviour: no cache in a release job.
+          package-manager-cache: false
       - name: Guard credential
+        env:
+          # A comparison, never the value: the step sees only true or false.
+          HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
         run: |
-          if [[ -z "${{ secrets.NPM_TOKEN }}" ]]; then
+          if [[ $HAS_NPM_TOKEN != true ]]; then
             echo "::error title=Missing NPM_TOKEN::Add the secret to publish to npm."; exit 1
           fi
       - run: npm ci || npm install
@@ -132,13 +206,16 @@ jobs:
   pypi:
     name: 🐍 PyPI
     needs: detect
-    if: needs.detect.outputs.python == 'true'
+    if: inputs.pypi && needs.detect.outputs.python == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write   # PyPI trusted publishing (OIDC) — no token needed
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Build distributions
@@ -146,7 +223,7 @@ jobs:
           python -m pip install --upgrade pip build
           python -m build
       - name: Publish to PyPI (trusted publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           skip-existing: true
 
@@ -155,23 +232,28 @@ jobs:
     needs: detect
     if: needs.detect.outputs.docker == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Image metadata
         id: meta
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "tags=${repo}:${{ inputs.version }},${repo}:latest" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+          echo "tags=${repo}:${VERSION},${repo}:latest" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: true

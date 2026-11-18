@@ -1,0 +1,12 @@
+# actionlint configuration (https://github.com/rhysd/actionlint/blob/main/docs/config.md).
+#
+# actionlint 1.7.12, the latest release on 2026-11-15, does not yet know the
+# job context's workflow identity properties that GitHub added in September
+# 2026 (https://github.blog/changelog/2026-09-03-github-actions-early-september-2026-updates).
+# publish.yml reads job.workflow_sha and job.workflow_repository to run
+# detect-stack from its own commit (#20). Remove this entry once an actionlint
+# release accepts those properties; nothing else in any workflow is ignored.
+paths:
+  .github/workflows/publish.yml:
+    ignore:
+      - 'property "workflow_(sha|repository)" is not defined in object type \{check_run_id: number;'

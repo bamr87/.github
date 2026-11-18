@@ -9,7 +9,7 @@ name: 🎯 release-please (reusable)
 #
 #   jobs:
 #     release:
-#       uses: bamr87/.github/.github/workflows/release-please.yml@main
+#       uses: bamr87/.github/.github/workflows/release-please.yml@v1
 #       permissions: { contents: write, pull-requests: write }
 
 on:
@@ -59,6 +59,17 @@ jobs:
   release-please:
     name: release-please
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One queue per caller repo, target branch and config, shared with relock
+    # below, so back-to-back pushes update the release PR one at a time instead
+    # of racing relock's push. A running job is never cancelled: a cancelled
+    # release run can leave a tag without its GitHub Release. GitHub keeps one
+    # pending job per group, so a newer job replaces an older pending one, and
+    # the newer run carries every commit. The dotgithub- prefix keeps the group
+    # apart from a caller's own workflow-level group: sharing one deadlocks.
+    concurrency:
+      group: dotgithub-release-please-${{ github.repository }}-${{ inputs.target-branch }}-${{ inputs.config-file }}
+      cancel-in-progress: false
     outputs:
       releases_created: ${{ steps.rp.outputs.releases_created }}
       release_created: ${{ steps.rp.outputs.release_created }}
@@ -68,7 +79,7 @@ jobs:
       pr: ${{ steps.rp.outputs.pr }}
     steps:
       - id: rp
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: ${{ inputs.config-file }}
@@ -86,10 +97,15 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.prs_created == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The same queue as the release-please job above (see the comment there).
+    concurrency:
+      group: dotgithub-release-please-${{ github.repository }}-${{ inputs.target-branch }}-${{ inputs.config-file }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
