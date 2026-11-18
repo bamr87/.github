@@ -2,7 +2,7 @@
 
 # .github
 
-> The bamr87 owner-level `.github` repo: the community-health defaults every bamr87 repo inherits, the starter release workflow template, and the reusable release and publish workflows other repos call.
+> The bamr87/.github repo's direction is to become the ultimate open home for all things fleet-wide GitHub automation and community health: data, tools, resources and transparency, with reusable release workflows, composite actions and inherited community-health files for every bamr87 repo ([constitution](docs/constitution.md) §1).
 
 ## What this repo is
 
