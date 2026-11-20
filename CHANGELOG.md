@@ -7,6 +7,11 @@ All notable changes to this project are documented in this file. The format is b
 ### Added
 
 - `CHANGELOG.md`, in Keep a Changelog format.
+- `release-please.yml`: the release is made by the fleet's release app, a GitHub App. When the caller holds `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY`, each job mints an installation token for its own repo (contents and pull-requests write, revoked when the job ends) and uses it to tag, to open the release PR and to push the lockfile commit. The order is the app, then `RELEASE_PLEASE_TOKEN`, then `GITHUB_TOKEN`, so a caller that holds only the PAT releases as before. A key without the client ID, or an app that cannot mint a token, fails the run and says why. Both secrets are declared, so a caller under another owner can pass them by name.
+
+### Deprecated
+
+- `release-please.yml`: the `RELEASE_PLEASE_TOKEN` secret, still read where the release app is not provisioned.
 
 ### Changed
 

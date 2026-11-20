@@ -110,7 +110,7 @@ Each registry job runs when `detect-stack` finds its ecosystem. RubyGems and npm
 | npm | `NPM_TOKEN` (repo secret) | published with provenance |
 | PyPI | none | **trusted publishing** (OIDC) — configure the publisher on PyPI; see the `pypi` input below |
 | GHCR | none | uses the built-in `GITHUB_TOKEN` |
-| CI on the release PR | `RELEASE_PLEASE_TOKEN` (optional PAT) | so the release PR triggers CI; falls back to `GITHUB_TOKEN` |
+| Opening the release PR | the fleet's release app: `RELEASE_APP_CLIENT_ID` + `RELEASE_APP_PRIVATE_KEY` | a GitHub App; each job mints a token for its own repo, so the release PR triggers CI and nothing expires. The hub fans both secrets out ([runbook](https://github.com/bamr87/bamr87/blob/main/docs/RELEASES.md#the-release-app)). Falls back to `RELEASE_PLEASE_TOKEN` (legacy PAT), then `GITHUB_TOKEN` |
 
 **Turning the PyPI job off.** `publish.yml` takes an optional boolean input `pypi` (default `true`). PyPI trusted publishing cannot name a reusable workflow as its publisher, so a reusable `🐍 PyPI` job fails with `invalid-publisher`. A repo that publishes to PyPI uploads from its own top-level job in its `release.yml` and passes `pypi: false`, and a repo whose `pyproject.toml` only holds tool settings passes it too; the job then shows as skipped. Callers that omit the input behave as before.
 
