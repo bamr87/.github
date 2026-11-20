@@ -17,6 +17,22 @@ name: 🎯 release-please (reusable)
 #     release:
 #       uses: bamr87/.github/.github/workflows/release-please.yml@v1
 #       permissions: { contents: write, pull-requests: write }
+#       secrets: inherit
+#
+# THE CREDENTIAL, the same order as the hub's copy (its docs/RELEASES.md, "The
+# release app", is the runbook), first one present wins:
+#
+#   1. the fleet's release app            a GitHub App; each job mints a token
+#                                         for this repo from RELEASE_APP_CLIENT_ID
+#                                         and RELEASE_APP_PRIVATE_KEY. Nothing
+#                                         expires and the release PR runs CI.
+#   2. RELEASE_PLEASE_TOKEN (legacy PAT)  the same, until the PAT expires
+#   3. GITHUB_TOKEN                       only where the repo lets Actions open
+#                                         pull requests; that PR's CI waits for
+#                                         a person to approve it
+#
+# `secrets: inherit` reaches a reusable workflow of the caller's own owner
+# only. A caller under another owner names the secrets it passes.
 
 on:
   workflow_call:
@@ -31,11 +47,25 @@ on:
         type: string
         default: main
     secrets:
+      RELEASE_APP_CLIENT_ID:
+        description: >
+          Client ID of the fleet's release app, a GitHub App with contents +
+          pull-requests write installed on the caller's repo. Inert without the
+          key.
+        required: false
+      RELEASE_APP_PRIVATE_KEY:
+        description: >
+          A private key of the release app, in PEM form (multi-line, or one
+          line with `\n` escapes). Its presence arms the app: each job then
+          mints its own token, so the release PR's commits trigger CI and the
+          tag fires the workflows that listen for it. A key without
+          RELEASE_APP_CLIENT_ID fails the run.
+        required: false
       RELEASE_PLEASE_TOKEN:
         description: >
-          Optional PAT so the release PR's commits trigger CI (commits made with
-          the default GITHUB_TOKEN do not trigger other workflows). Falls back to
-          GITHUB_TOKEN when unset.
+          LEGACY, read only when the release app is not provisioned: a PAT that
+          does the app's job until it expires. Falls back to GITHUB_TOKEN when
+          unset.
         required: false
     outputs:
       releases_created:
@@ -83,14 +113,82 @@ jobs:
       version: ${{ steps.rp.outputs.version }}
       prs_created: ${{ steps.rp.outputs.prs_created }}
       pr: ${{ steps.rp.outputs.pr }}
+      # true | false, never a value: tells `relock` to mint its own token.
+      app: ${{ steps.cred.outputs.app }}
     steps:
+      # The KEY arms the app; the client ID alone is inert, so a fan-out can
+      # write the client ID to every repo first and the key second without a
+      # red release run in between. A key with no client ID is a setup left
+      # half done, and falling through to the PAT would hide it.
+      - name: Find the release credential
+        id: cred
+        env:
+          # Comparisons, never the values: each prints true or false.
+          HAVE_ID: ${{ secrets.RELEASE_APP_CLIENT_ID != '' }}
+          HAVE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+          HAVE_PAT: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$HAVE_KEY" = "true" ] && [ "$HAVE_ID" != "true" ]; then
+            echo "::error title=The release app has a key and no client ID::$REPO holds RELEASE_APP_PRIVATE_KEY without RELEASE_APP_CLIENT_ID. Set the client ID, or remove the key to release without the app. A caller under another owner than this workflow's must pass both by name; \`secrets: inherit\` does not cross owners."
+            exit 1
+          fi
+          if [ "$HAVE_ID" = "true" ] && [ "$HAVE_KEY" != "true" ]; then
+            echo "::warning title=The release app is not armed yet::$REPO holds RELEASE_APP_CLIENT_ID and no RELEASE_APP_PRIVATE_KEY. The key is what arms the app; this run uses the next credential in the order."
+          fi
+          echo "app=$HAVE_KEY" >> "$GITHUB_OUTPUT"
+          if [ "$HAVE_KEY" = "true" ]; then
+            echo "Release credential: the release app."
+          elif [ "$HAVE_PAT" = "true" ]; then
+            echo "Release credential: RELEASE_PLEASE_TOKEN (legacy PAT)."
+          else
+            echo "Release credential: GITHUB_TOKEN. It opens the release PR only where the repo lets Actions create pull requests."
+          fi
+
+      # An installation token for this repo alone, cut down to the two
+      # permissions a release needs; the action revokes it when the job ends.
+      # `app-id` carries the CLIENT ID: the action renamed the input to
+      # `client-id` in v3.1.0 and reads either into the same value, but
+      # actionlint 1.7.12 (lint.yml) does not know the new name yet. Rename
+      # both steps when it does.
+      - name: Mint the release app's token
+        id: app
+        if: steps.cred.outputs.app == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - id: rp
         uses: googleapis/release-please-action@v5
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: ${{ inputs.config-file }}
           manifest-file: ${{ inputs.manifest-file }}
           target-branch: ${{ inputs.target-branch }}
+
+      # The app was armed and could not mint, so release-please never ran.
+      # Never a fallback to the PAT: an armed app that is broken has to show.
+      - name: Explain a failed mint
+        if: failure() && steps.app.conclusion == 'failure'
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "### The release app could not mint a token for \`$REPO\`"
+            echo
+            echo "The app's key and client ID are both set here, so the app is armed, but GitHub refused the token. Nothing was tagged and no release PR was touched; the next green run catches up."
+            echo
+            echo "- **The app is not installed on this repo.** Open the app's page, Install App, and include \`$REPO\` (or all repositories of its owner)."
+            echo "- **The key does not belong to the app.** \`RELEASE_APP_PRIVATE_KEY\` must be a key generated on the app whose client ID is in \`RELEASE_APP_CLIENT_ID\`, whole, from \`-----BEGIN\` to \`-----END\`."
+            echo "- **The app lacks a permission.** It needs Contents and Pull requests, both read and write."
+            echo
+            echo "Setup and repair: [docs/RELEASES.md](https://github.com/bamr87/bamr87/blob/main/docs/RELEASES.md#the-release-app) in the hub. To fall back to the legacy PAT or GITHUB_TOKEN on purpose, remove both app secrets."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=The release app could not mint a token::See the run summary for the three causes and the fix."
 
   # When release-please opens/updates a release PR, the version bump it makes to
   # the version file is NOT reflected in lockfiles (Gemfile.lock pins the gemspec
@@ -111,10 +209,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A job of its own, so a token of its own: the release job's was revoked
+      # when that job ended. The lockfile commit becomes the release PR's head,
+      # so it is pushed by a credential whose pushes trigger CI.
+      - name: Mint the release app's token
+        id: app
+        if: needs.release-please.outputs.app == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}   # the client ID; see the release job
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
       - name: Re-lock Gemfile.lock
         if: hashFiles('Gemfile') != ''
